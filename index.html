@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Reset Password – GymGees</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin:0; background:#f9fafb; }
+      .wrap { max-width:520px; margin:0 auto; padding:28px; }
+      .card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:18px; }
+      label { display:block; font-weight:700; margin:14px 0 6px; }
+      input { width:100%; padding:10px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; }
+      button { width:100%; margin-top:16px; padding:12px; border:0; border-radius:10px; background:#1D3D47; color:#fff; font-weight:800; font-size:15px; cursor:pointer; }
+      .msg { margin:12px 0; padding:10px; border:1px solid #e5e7eb; border-radius:10px; background:#fff; }
+      .muted { opacity:.7; font-size:12px; margin-top:12px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h2>Reset your password</h2>
+      <p style="opacity:.8">Enter a new password for your GymGees account.</p>
+
+      <div class="card">
+        <div id="msg" class="msg">Loading…</div>
+
+        <label>New password</label>
+        <input id="pw" type="password" />
+
+        <label>Confirm password</label>
+        <input id="pw2" type="password" />
+
+        <button id="btn" type="button">Update password</button>
+
+        <div class="muted">
+          If you see “Missing token”, request a new reset email.
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+      const SUPABASE_URL = "https://uhfwjmghaawdxdbnhfxe.supabase.co";
+      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmdoYWF3ZHhkYm5oZnhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI5NzI4NzcsImV4cCI6MjA3ODU0ODg3N30.vL-uJ1zYCEF_f1bl_LM8zNnYJy5Cgk-8JbgPMX4zVvo";
+
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      const msgEl = document.getElementById("msg");
+      const btn = document.getElementById("btn");
+
+      const setMsg = (t) => (msgEl.textContent = t);
+
+      async function ensureRecoverySession() {
+        const params = new URLSearchParams(window.location.search);
+        const token_hash = params.get("token_hash");
+        const type = params.get("type") || "recovery";
+        if (!token_hash) throw new Error("Missing token. Please request a new reset email.");
+
+        const { error } = await supabase.auth.verifyOtp({ type, token_hash });
+        if (error) throw error;
+      }
+
+      ensureRecoverySession()
+        .then(() => setMsg("Link verified ✅ Please enter a new password."))
+        .catch((e) => setMsg("❌ " + (e?.message || String(e))));
+
+      btn.addEventListener("click", async () => {
+        try {
+          setMsg("Verifying…");
+          await ensureRecoverySession();
+
+          const pw = document.getElementById("pw").value || "";
+          const pw2 = document.getElementById("pw2").value || "";
+          if (!pw || !pw2) return setMsg("Please fill in both password fields.");
+          if (pw !== pw2) return setMsg("Passwords do not match.");
+
+          setMsg("Updating password…");
+          const { error } = await supabase.auth.updateUser({ password: pw });
+          if (error) throw error;
+
+          setMsg("✅ Password updated. You can now return to the app and log in.");
+          await supabase.auth.signOut();
+        } catch (e) {
+          setMsg("❌ " + (e?.message || String(e)));
+        }
+      });
+    </script>
+  </body>
+</html>
